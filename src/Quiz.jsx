@@ -1,33 +1,26 @@
-import { useEffect } from "react"
+import { v4 as uuidv4 } from 'uuid';
 
+export default function Quiz(props) {
 
-export default function Quiz() {
+const answers = props.answers.map((answer,index) => {
+    
+    return <div key={uuidv4()}>
+                <input
+                type="radio"
+                value={answer}
+                name={`${props.id}`}
+                id={`${props.id}-${index}`}
+                />
+                <label htmlFor={`${props.id}-${index}`}>{answer}</label>
+            </div>
+})
 
-    useEffect(() => {
-        console.log('effect ran');
-        const abortController = new AbortController();
-
-        async function getData() {
-            try {
-                const res = await fetch('https://opentdb.com/api.php?amount=5&category=9&difficulty=medium&type=multiple');
-
-                if(!res.ok) {
-                    throw Error(res.status)
-                }
-                const data = await res.json();
-
-                console.log(data);
-            }   catch(error) {
-                console.error(error);
-            };   
-        };
-        getData()
-        return () => abortController.abort();
-    }, []);
-        
     return (
         <div className="quiz-container">
-            Test
+            <h4>{props.question}</h4>
+            <form>
+                {answers}
+            </form>
         </div>
     )
 }
