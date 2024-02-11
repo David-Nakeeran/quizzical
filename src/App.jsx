@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {decode} from 'html-entities';
-import Start from './Start';
-import Quiz from './Quiz';
+import Start from './components/Start';
+import Quiz from './components/Quiz';
 'use strict';
 
 function App() {
   const [isQuizAlive, setIsQuizAlive] = useState(false);
-
-  const [quizData, setQuizData] = useState([]);
+  const [quiz, setQuiz] = useState([]);
+  const [showAnswers, setshowAnswers] = useState(false);
+  const [score, setScore] = useState(0);
+  const [playAgain, setPlayAgain] = useState(Date.now());
 
   function startQuiz() {
     setIsQuizAlive(prevState => !prevState);
@@ -35,52 +37,105 @@ function App() {
         return arr;
     };
 
-    useEffect(() => {
-        
-        const abortController = new AbortController();
+    async function getData() {
+        try {
+            const res = await fetch('https://opentdb.com/api.php?amount=5&category=9&difficulty=easy&type=multiple');
 
-        async function getData() {
-            try {
-                const res = await fetch('https://opentdb.com/api.php?amount=5&category=9&difficulty=medium&type=multiple');
-
-                if(!res.ok) {
-                    throw Error(res.status)
-                }
-                const data = await res.json();
+            if(!res.ok) {
+                throw Error(res.status)
+            }
+            const data = await res.json();
+            
+            setQuiz(data.results.map(item => {
                 
-                setQuizData(data.results.map(item => {
-                    
-                    return {
-                        id: uuidv4(),
-                        question: decode(item.question),
-                        correctAnswer: decode(item.correct_answer),
-                        answers: createAnswersArray(item.incorrect_answers, item.correct_answer)
+                return {
+                    id: uuidv4(),
+                    question: decode(item.question),
+                    correctAnswer: decode(item.correct_answer),
+                    answers: createAnswersArray(item.incorrect_answers, item.correct_answer),
+                    selectedAnswer: "",
+                    showCorrectAnswers: false
 
-                    };
-                }));
-            }   catch(error) {
-                console.error(error);
-            };   
-        };
-        getData()
-        return () => abortController.abort();
-    }, []);
+                };
+            }));
+        }   catch(error) {
+            console.error(error);
+            return [];
+        };   
+    };
+
+
+        useEffect(() => {
+            const abortController = new AbortController();
+            getData();
+            return () => abortController.abort();
+        }, [playAgain]);
+
         
+    function handleChange(e) {
+        const {value, name} = e.target;
+        setQuiz(prevState => {
+            return prevState.map(item => {
+                if(name === item.id) {
+                    return {
+                        ...item, selectedAnswer: `${value}`,
+                        selected: true
+                    };
+                } else {
+                    return {...item, selected: false};
+                };
+            });
+        });  
+    };
 
-  const quiz = quizData.map(item => (
-    <Quiz
-      key={item.id}
-      id={item.id}
-      question={item.question}
-      correctAnswer={item.correctAnswer}
-      answers={item.answers}
-    />
-  ))
- 
-  
+    function showCorrectAnswers(e) {
+        e.preventDefault();
+        calculateScore();
+        setQuiz(prevState => {
+            return prevState.map(item => {
+                if(item.answers.includes(item.correctAnswer)) {
+                    return {
+                        ...item,
+                        showCorrectAnswers: true
+                    };
+                } else {
+                    return item;
+                };
+            });
+        });
+      setshowAnswers(true);  
+    };
+
+    function calculateScore() {
+        for(const item of quiz) {
+            if(item.selectedAnswer === item.correctAnswer) {
+                setScore(prevState => prevState + 1);
+            };
+        }; 
+    };
+
+    function newQuiz() {
+        setPlayAgain(Date.now())
+    }
+
+    function resetQuiz(e) {
+        e.preventDefault();
+        setshowAnswers(false);
+        newQuiz();
+        setScore(0);
+        startQuiz();
+    };
+
   return (
     <main className='container'>
-      {isQuizAlive ? <div>{quiz}</div> : <Start startQuiz={() => startQuiz()}/>}
+      {isQuizAlive ? 
+      <div><Quiz quiz={quiz}
+       selectAnswer={ handleChange} 
+       checkAnswers={showCorrectAnswers} 
+       showAnswers={showAnswers}
+       score={score}
+       resetQuiz={resetQuiz}
+       /></div> : <Start startQuiz={() => startQuiz()}/>}
       
     </main>
   )
